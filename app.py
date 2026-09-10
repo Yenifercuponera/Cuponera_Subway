@@ -29,7 +29,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- PERSISTENCIA LOCAL Y SINCRONIZACIÓN CSV ---
+# --- PERSISTENCIA EN BASE DE DATOS LOCAL (CSV) ---
 CSV_FILE = "base_clientes_subway.csv"
 
 def cargar_base_datos():
@@ -51,47 +51,42 @@ def guardar_registro(nuevo_registro):
 if 'db_clientes' not in st.session_state:
     st.session_state.db_clientes = cargar_base_datos()
 
-if 'db_redenciones' not in st.session_state:
-    st.session_state.db_redenciones = pd.DataFrame(columns=[
-        "ID_Cuponera", "Beneficio", "Tienda", "Fecha_Redencion"
-    ])
-
 BENEFICIOS = [
     "Combo Classic", "Combo Pollo", "Galleta gratis", 
     "Bebida gratis", "2x1 en Sub 15 cm", "Upgrade de combo"
 ]
 
-# --- MENÚ LATERAL ---
+# --- NAVEGACIÓN PERFILES ---
 st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/5/5c/Subway_2016_logo.svg", width=180)
 perfil = st.sidebar.selectbox("Seleccione el Perfil:", [
-    "1. Portal Cliente (Registro y Cuponera Digital)",
-    "2. Portal Franquicia (Punto de Venta)",
+    "1. Portal Cliente (Escaneo y Registro)",
+    "2. Generador de QR Impreso (Para Publicidad)",
     "3. Dashboard Casa Matriz"
 ])
 
 # ==========================================
-# 1. PORTAL CLIENTE (FASE 1)
+# 1. PORTAL CLIENTE (FASE DE REGISTRO)
 # ==========================================
-if perfil == "1. Portal Cliente (Registro y Cuponera Digital)":
-    st.markdown("<h1 class='main-title'>💚 Subway Fest: Activa tu Cuponera Digital</h1>", unsafe_allow_html=True)
-    st.write("Escanea, regístrate y recibe tu cuponera digital única para acceder a 6 beneficios y acumular puntos de fidelización.")
+if perfil == "1. Portal Cliente (Escaneo y Registro)":
+    st.markdown("<h1 class='main-title'>💚 Subway Fest: Registro de Cuponera Digital</h1>", unsafe_allow_html=True)
+    st.write("Completa el formulario para activar tu cuponera digital única y ganar +100 Subway Points de bienvenida.")
 
     col1, col2 = st.columns([1, 1])
 
     with col1:
-        st.subheader("📋 Formulario de Registro de Cliente")
+        st.subheader("📋 Formulario de Registro")
         with st.form("form_registro_cliente"):
             nombre = st.text_input("Nombre Completo *")
             cedula = st.text_input("Número de Cédula / Documento (para acumular puntos)")
             correo = st.text_input("Correo Electrónico *")
             telefono = st.text_input("Teléfono Móvil *")
-            fecha_cumple = st.date_input("Fecha de Cumpleaños (Beneficios especiales)", value=date(2000, 1, 1))
+            fecha_cumple = st.date_input("Fecha de Cumpleaños (Para beneficios especiales)", value=date(2000, 1, 1))
             
-            submit_reg = st.form_submit_button("🎟️ Generar Mi Cuponera Digital")
+            submit_reg = st.form_submit_button("🎟️ Registrarme y Obtener Cuponera")
 
             if submit_reg:
                 if nombre and correo and telefono:
-                    # Generar ID único e irrepetible para la cuponera del cliente
+                    # Generación de Código Único
                     codigo_unico = f"SUB-2026-{uuid.uuid4().hex[:6].upper()}"
                     
                     nuevo_registro = {
@@ -101,11 +96,11 @@ if perfil == "1. Portal Cliente (Registro y Cuponera Digital)":
                         "Correo": correo,
                         "Telefono": telefono,
                         "Fecha_Cumpleanos": str(fecha_cumple),
-                        "Puntos_Fidelidad": 100,  # 100 puntos por bienvenida
+                        "Puntos_Fidelidad": 100,
                         "Fecha_Registro": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
                     
-                    # Guardar en la base de datos (CSV / GitHub)
+                    # Guardar registro
                     st.session_state.db_clientes = guardar_registro(nuevo_registro)
                     st.session_state.ultimo_registro = nuevo_registro
                     st.success("🎉 ¡Registro completado con éxito!")
@@ -113,7 +108,7 @@ if perfil == "1. Portal Cliente (Registro y Cuponera Digital)":
                     st.error("Por favor completa los campos obligatorios (*).")
 
     with col2:
-        st.subheader("🎟️ Tu Cuponera Digital")
+        st.subheader("🎟️ Tu Cuponera Digital Asignada")
         if 'ultimo_registro' in st.session_state:
             reg = st.session_state.ultimo_registro
             
@@ -122,18 +117,17 @@ if perfil == "1. Portal Cliente (Registro y Cuponera Digital)":
                     <h3 style='color: #FFC72C; margin:0;'>CUPONERA SUBWAY FEST</h3>
                     <p style='margin:5px 0;'><b>Código Único:</b> <span style='color:#008938; font-size:18px;'>{reg['ID_Cuponera']}</span></p>
                     <p style='margin:0;'><b>Titular:</b> {reg['Nombre']} | <b>Cédula:</b> {reg['Cedula']}</p>
-                    <p style='margin:0;'>⭐ <b>Puntos de Fidelidad:</b> {reg['Puntos_Fidelidad']} pts</p>
+                    <p style='margin:0;'>⭐ <b>Subway Points:</b> {reg['Puntos_Fidelidad']} pts</p>
                 </div>
             """, unsafe_allow_html=True)
 
             st.write("---")
-            st.write("#### Activar Beneficio para Tienda")
-            beneficio_sel = st.selectbox("Selecciona el beneficio que deseas redimir:", BENEFICIOS)
+            st.write("#### Canjear Beneficio en Restaurante")
+            beneficio_sel = st.selectbox("Selecciona un beneficio:", BENEFICIOS)
             
-            if st.button("Generar QR para Canjear en Caja"):
+            if st.button("Generar QR para Canje en Caja"):
                 payload = json.dumps({
                     "id_cuponera": reg['ID_Cuponera'],
-                    "cedula": reg['Cedula'],
                     "beneficio": beneficio_sel,
                     "timestamp": datetime.now().strftime("%Y%m%d%H%M%S")
                 })
@@ -142,18 +136,36 @@ if perfil == "1. Portal Cliente (Registro y Cuponera Digital)":
                 buffer = BytesIO()
                 qr.save(buffer, format="PNG")
                 
-                st.image(buffer.getvalue(), caption=f"Muestra este QR al cajero para: {beneficio_sel}", width=220)
+                st.image(buffer.getvalue(), caption=f"Muestra este QR en caja para: {beneficio_sel}", width=220)
         else:
-            st.info("Diligencia el formulario de la izquierda para generar y visualizar tu cuponera digital personalizada.")
+            st.info("Completa tu registro a la izquierda para ver tu cuponera personalizada.")
 
 # ==========================================
-# 2. PORTAL FRANQUICIA & 3. CASA MATRIZ
+# 2. GENERADOR DE QR IMPRESO (PUBLICIDAD)
 # ==========================================
-elif perfil == "2. Portal Franquicia (Punto de Venta)":
-    st.markdown("<h1 class='main-title'>🏬 Validador en Punto de Venta</h1>", unsafe_allow_html=True)
-    st.write("Escanea el QR o ingresa la cuponera para aplicar la redención.")
-    st.dataframe(st.session_state.db_clientes, use_container_width=True)
+elif perfil == "2. Generador de QR Impreso (Para Publicidad)":
+    st.markdown("<h1 class='main-title'>🖨️ Generador de Código QR de Registro</h1>", unsafe_allow_html=True)
+    st.write("Este módulo genera el código QR que se imprimirá en los cupones físicos o afiches para dirigir a los clientes a la aplicación.")
 
+    app_url = st.text_input("Ingresa el enlace público de tu app de Streamlit:", 
+                            value="https://cuponerasubway.streamlit.app/")
+
+    if st.button("Generar QR para Imprimir"):
+        qr = qrcode.make(app_url)
+        buffer = BytesIO()
+        qr.save(buffer, format="PNG")
+        
+        st.image(buffer.getvalue(), caption="Código QR de Acceso al Formulario de Registro", width=250)
+        st.download_button(
+            label="💾 Descargar Imagen del QR para Diseños",
+            data=buffer.getvalue(),
+            file_name="QR_Registro_Subway.png",
+            mime="image/png"
+        )
+
+# ==========================================
+# 3. DASHBOARD CASA MATRIZ
+# ==========================================
 elif perfil == "3. Dashboard Casa Matriz":
-    st.markdown("<h1 class='main-title'>📈 Base de Datos Centralizada de Clientes</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-title'>📈 Base de Datos Centralizada</h1>", unsafe_allow_html=True)
     st.dataframe(st.session_state.db_clientes, use_container_width=True)
